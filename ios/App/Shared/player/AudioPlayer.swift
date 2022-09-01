@@ -298,29 +298,30 @@ class AudioPlayer: NSObject {
         updateNowPlaying()
     }
     
-    public func pause() {
+    public func pause(fromSeek: Bool = false) {
         guard self.isInitialized() else { return }
         
         self.audioPlayer.pause()
         
-        Task {
-            if let currentTime = self.getCurrentTime() {
-                await PlayerProgress.shared.syncFromPlayer(currentTime: currentTime, includesPlayProgress: self.isPlaying(), isStopping: true)
-            }
-        }
-        
         self.status = 0
         self.rate = 0.0
         
-        updateNowPlaying()
-        
-        self.startPausedTimer()
+        if !fromSeek {
+            Task {
+                if let currentTime = self.getCurrentTime() {
+                    await PlayerProgress.shared.syncFromPlayer(currentTime: currentTime, includesPlayProgress: self.isPlaying(), isStopping: true)
+                }
+            }
+            
+            self.updateNowPlaying()
+            self.startPausedTimer()
+        }
     }
     
     public func seek(_ to: Double, from: String) {
         let continuePlaying = rate > 0.0
         
-        pause()
+        pause(fromSeek: true)
         
         NSLog("Seek to \(to) from \(from)")
         
