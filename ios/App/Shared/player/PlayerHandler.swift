@@ -11,7 +11,7 @@ import RealmSwift
 class PlayerHandler {
     private static var player: AudioPlayer?
     
-    public static var sleepTimerChapterStopTime: Int? = nil
+    public static var sleepTimerChapterStopTime: Double? = nil
     
     public static func startPlayback(sessionId: String, playWhenReady: Bool, playbackRate: Float) {
         guard let session = Database.shared.getPlaybackSession(id: sessionId) else { return }
@@ -67,7 +67,7 @@ class PlayerHandler {
             // Return the player time until sleep
             var timeUntilSleep: Double? = nil
             if let sleepTimerChapterStopTime = sleepTimerChapterStopTime {
-                timeUntilSleep = Double(sleepTimerChapterStopTime) - currentTime
+                timeUntilSleep = sleepTimerChapterStopTime - currentTime
             } else if let stopAt = player.getSleepStopAt() {
                 timeUntilSleep = stopAt - currentTime
             }
@@ -104,8 +104,7 @@ class PlayerHandler {
     
     public static func setChapterSleepTime(stopAt: Double) {
         guard let player = player else { return }
-        self.sleepTimerChapterStopTime = Int(stopAt)
-        player.setSleepTime(stopAt: stopAt, scaleBasedOnSpeed: false)
+        player.setChapterSleepTime(stopAt: stopAt)
     }
     
     public static func increaseSleepTime(increaseSeconds: Double) {

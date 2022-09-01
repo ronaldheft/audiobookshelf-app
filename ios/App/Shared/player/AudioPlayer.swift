@@ -435,10 +435,21 @@ class AudioPlayer: NSObject {
             self.sleepTimeStopAt = stopAt
         }
         
+        // Get the current track
+        guard let playbackSession = self.getPlaybackSession() else { return }
+        let currentTrack = playbackSession.audioTracks[currentTrackIndex]
+        
+        // Set values
         guard let sleepTimeStopAt = self.sleepTimeStopAt else { return }
-        let sleepTime = CMTime(seconds: sleepTimeStopAt, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        guard let trackStartTime = currentTrack.startOffset else { return }
+        guard let trackEndTime = currentTrack.endOffset else { return }
+        
+        // Verify the stop is during the current audio track
+        guard trackEndTime >= sleepTimeStopAt else { return }
         
         // Schedule the observation time
+        let trackBasedStopTime = sleepTimeStopAt - trackStartTime
+        let sleepTime = CMTime(seconds: trackBasedStopTime, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         var times = [NSValue]()
         times.append(NSValue(time: sleepTime))
         
@@ -453,25 +464,39 @@ class AudioPlayer: NSObject {
         NotificationCenter.default.post(name: NSNotification.Name(PlayerEvents.sleepSet.rawValue), object: nil)
     }
     
+    public func setChapterSleepTime(stopAt: Double) {
+        guard let currentTime = self.getCurrentTime() else { return }
+        PlayerHandler.sleepTimerChapterStopTime = stopAt
+        self.setSleepTime(stopAt: stopAt, scaleBasedOnSpeed: false)
+    }
+    
     private func rescheduleSleepTimerAtTime(time: Double, secondsRemaining: Int?) {
-        // Not a chapter sleep timer
-        let hadToCancelChapterSleepTimer = decideIfChapterSleepTimerNeedsToBeCanceled(time: time)
-        guard !hadToCancelChapterSleepTimer else { return }
-        guard PlayerHandler.sleepTimerChapterStopTime == nil else { return }
-        
         // Verify sleep timer is set
-        guard self.sleepTimeToken != nil else { return }
+        guard self.sleepTimeStopAt != nil else { return }
         
-        // Update the sleep timer
-        if let secondsRemaining = secondsRemaining {
-            let newSleepTimerPosition = time + Double(secondsRemaining)
-            self.setSleepTime(stopAt: newSleepTimerPosition, scaleBasedOnSpeed: true)
+        // Handle a chapter sleep timer
+        if let chapterStopTime = PlayerHandler.sleepTimerChapterStopTime {
+            
+            // Verify our sleep timer is still valid
+            let hadToCancel = decideIfChapterSleepTimerNeedsToBeCanceled(time: time)
+            guard !hadToCancel else { return }
+            
+            // Update the sleep timer
+            self.setSleepTime(stopAt: chapterStopTime, scaleBasedOnSpeed: false)
+        
+        } else { // Regular sleep timer
+            
+            // Update the sleep timer
+            if let secondsRemaining = secondsRemaining {
+                let newSleepTimerPosition = time + Double(secondsRemaining)
+                self.setSleepTime(stopAt: newSleepTimerPosition, scaleBasedOnSpeed: true)
+            }
         }
     }
     
     private func decideIfChapterSleepTimerNeedsToBeCanceled(time: Double) -> Bool {
         if let chapterSleepTime = PlayerHandler.sleepTimerChapterStopTime {
-            let sleepIsBeforeCurrentTime = Double(chapterSleepTime) <= time
+            let sleepIsBeforeCurrentTime = chapterSleepTime <= time
             if sleepIsBeforeCurrentTime {
                 PlayerHandler.sleepTimerChapterStopTime = nil
                 self.removeSleepTimer()
