@@ -466,7 +466,6 @@ class AudioPlayer: NSObject {
     }
     
     public func setChapterSleepTime(stopAt: Double) {
-        guard let currentTime = self.getCurrentTime() else { return }
         PlayerHandler.sleepTimerChapterStopTime = stopAt
         self.setSleepTime(stopAt: stopAt, scaleBasedOnSpeed: false)
     }
